@@ -1,0 +1,14 @@
+[Unit]
+Description=smstools HTTP API
+Wants=network-online.target
+After=network.target network-online.target
+
+[Service]
+Type=simple
+User=smsd
+ExecStart=/var/lib/smstools/smstools-http-api/start-http-api.sh
+StandardOutput=null
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

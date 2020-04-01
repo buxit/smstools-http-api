@@ -36,7 +36,7 @@ class ProductionConfig(Config):
     # Users database (htpasswd format)
     # Generate hash: openssl passwd -apr1 PASSWORD
     # username:$apr1$qSS22H6v$sem/.bUQXjGUIIHb.MXLw1
-    HTPASSWD_PATH="/usr/local/etc/smstools-http-api/htpasswd.users"
+    HTPASSWD_PATH="/etc/smstools-http-api/htpasswd.users"
 
     @classmethod
     def init_app(cls, app):
@@ -77,5 +77,5 @@ config = {
     'development': DevelopmentConfig,
     'production': ProductionConfig,
     'test': TestConfig,
-    'default': DevelopmentConfig
+    'default': ProductionConfig
 }

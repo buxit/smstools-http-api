@@ -2,9 +2,11 @@
 
 from __future__ import unicode_literals
 from flask import current_app, request, jsonify
+import xmltodict
+
 from . import api_1_0
 from .errors import bad_request
-from .authentication import auth
+from .authentication import auth, verify_password
 
 from .smstools import *
 
@@ -75,3 +77,84 @@ def outgoing_view():
 
     result = send_sms(data)
     return jsonify(result)
+
+
+def response_xml(code, description):
+    import xml.etree.cElementTree as ET
+    response = ET.Element("Response")
+    ET.SubElement(response, "Code").text = str(code)
+    ET.SubElement(response, "CodeDescription").text = description
+    return ET.tostring(response, encoding="ISO-8859-1")
+
+# xml_interface
+@api_1_0.route('/', methods=['GET', 'POST'])
+def outgoing_view_xml():
+
+    required_fields = ( 'mobiles', 'text' )
+
+    if request.method == 'POST':
+        request_object = {}
+        #print(request.data)
+        try:
+            xmldata = xmltodict.parse(request.data)
+        except:
+            return response_xml(4000, "ERR - BAD XML")
+
+        #print(xmldata)
+
+        if not verify_password(xmldata['Request']['AccountLogin']['#text'], xmldata['Request']['AccountPass']):
+            return response_xml(4001, "ERR - INVALID CREDENTIALS")
+        recipients = xmldata['Request']['Message']['Recipients']['Recipient']
+        mobiles = []
+        if isinstance(recipients, list):
+            for recipient in recipients:
+                mobiles.append('+' + recipient['#text'])
+        else:
+            mobiles.append('+' + recipients['#text'])
+        text = xmldata['Request']['Message']['Text']['#text']
+        if mobiles:
+            request_object['mobiles'] = mobiles
+        if text:
+            request_object['text'] = bytes.fromhex(text.replace('20AC', '80')).decode('cp1252')
+        #print(request_object)
+    else:
+        return response_xml(4000, "ERR - BAD XML")
+
+    # Check input data
+    for required_field in required_fields:
+        if required_field not in request_object:
+            return response_xml(4000, 'Missing required: {0}'.format(required_field))
+    if len(request_object['mobiles']) == 0:
+        return response_xml(4002, 'ERR – INVALID RECIPIENTS')
+
+    try:
+        unicode_str = unicode()
+    except NameError:
+        unicode_str = str()
+
+    for mobile in request_object['mobiles']:
+        if type(mobile) is not type(unicode_str):
+            return response_xml(4005, 'mobiles is not unicode')
+
+    if type(request_object['text']) is not type(unicode_str):
+        return response_xml(4005, 'text is not unicode')
+
+    queue = request_object.get('queue', current_app.config.get('DEFAULTQUEUE'))
+    data = {
+        'mobiles': request_object['mobiles'],
+        'text': request_object['text'],
+        'queue' : queue
+    }
+
+    result = send_sms(data)
+    ok=0
+    ids=[]
+    for m in result['mobiles']:
+        if result['mobiles'][m]['response'] == 'Ok':
+            ok += 1
+            ids.append(result['mobiles'][m]['message_id'])
+
+    if ok == len(result['mobiles']):
+        return response_xml(2001, 'OK - QUEUED')
+
+    return response_xml(5000, 'ERR - NOT RECIPIENTS OK')

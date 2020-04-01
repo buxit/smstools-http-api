@@ -12,6 +12,7 @@ def create_app(config_name):
     # attach routes and custom error pages here
     from .api_1_0 import api_1_0 as api_1_0_blueprint
     app.register_blueprint(api_1_0_blueprint, url_prefix='/api/v1.0')
+    app.register_blueprint(api_1_0_blueprint, url_prefix='/xml_interface')
 
     return app
 
